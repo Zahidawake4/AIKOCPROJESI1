@@ -5,9 +5,12 @@
   "type": "module",
   "main": "index.html",
   "scripts": {
-    "test": "echo \"Error: test specified\" -->"
+    "test": "echo \"Error: test specified\""
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@google/genai": "^0.1.1"
+  }
 }

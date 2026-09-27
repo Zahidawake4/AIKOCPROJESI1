@@ -271,9 +271,15 @@ Kurallar:
             })
         });
 
+        // Sunucudan dönen ham veriyi alıyoruz
         const data = await response.json();
 
-        if (response.ok && data.solution) {
+        // Eğer sunucu hata kodu döndürdüyse (örn. 500), direkt o hatayı fırlatıyoruz
+        if (!response.ok) {
+            throw new Error(data.error || `Sunucu hatası: ${response.status}`);
+        }
+
+        if (data.solution) {
             let finalResponse = data.solution;
             let topicMatch = finalResponse.match(/KONU KATEGORİSİ:\s*\*?([^\n\*]+)\*?/i);
             let topicName = topicMatch ? topicMatch[1].trim() : "Genel Yetenek / Matematik";
@@ -297,11 +303,12 @@ Kurallar:
             updateFreeBadge();
 
         } else {
-            throw new Error(data.error || "Geçerli yanıt alınamadı.");
+            throw new Error("Sunucudan geçerli bir çözüm alanı dönmedi.");
         }
     } catch (error) {
-        console.error(error);
-        if(solutionText) solutionText.innerHTML = `<strong style='color:red;'>Hata:</strong> ${error.message}`;
+        console.error("Çözüm İsteği Hatası:", error);
+        // Artık sabit metin yerine sunucudan gelen gerçek teknik hata ekrana yazılacak
+        if(solutionText) solutionText.innerHTML = `<strong style='color:red;'>Hata Detayı:</strong> ${error.message}`;
     }
 }
 
