@@ -14,8 +14,6 @@ let activeUserUid = null;
 let recognition = null;
 let isListening = false;
 
-const GEMINI_API_KEY = "API ANAHTARI GELECEK";
-
 window.onload = function() {
     if (typeof firebase !== 'undefined') {
         const auth = firebase.auth();
@@ -263,23 +261,20 @@ Kurallar:
 `;
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        const response = await fetch('/api/solve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: promptText },
-                        { inline_data: { mime_type: currentImageMimeType, data: currentImageBase64 } }
-                    ]
-                }]
+                prompt: promptText,
+                mimeType: currentImageMimeType,
+                imageBase64: currentImageBase64
             })
         });
 
         const data = await response.json();
 
-        if (data.candidates && data.candidates[0].content.parts[0].text) {
-            let finalResponse = data.candidates[0].content.parts[0].text;
+        if (response.ok && data.solution) {
+            let finalResponse = data.solution;
             let topicMatch = finalResponse.match(/KONU KATEGORİSİ:\s*\*?([^\n\*]+)\*?/i);
             let topicName = topicMatch ? topicMatch[1].trim() : "Genel Yetenek / Matematik";
 
@@ -302,7 +297,7 @@ Kurallar:
             updateFreeBadge();
 
         } else {
-            throw new Error("Geçerli yanıt alınamadı.");
+            throw new Error(data.error || "Geçerli yanıt alınamadı.");
         }
     } catch (error) {
         console.error(error);

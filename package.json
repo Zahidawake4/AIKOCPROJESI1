@@ -1,0 +1,13 @@
+{
+  "name": "aikocprojesi",
+  "version": "1.0.0",
+  "description": "YKS 2027 AI Coach Platform",
+  "type": "module",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: test specified\" -->"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
