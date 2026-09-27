@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-  // CORS ve Method kontrolü
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -28,7 +27,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Prompt eksik.' });
     }
 
-    // İstek gövdesini hazırla
     const contents = [{ text: prompt }];
     if (imageBase64) {
       contents.push({
@@ -39,7 +37,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Doğrudan Google REST API çağrısı (Ek kütüphane gerektirmez, %100 kararlıdır)
     const apiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -54,12 +51,12 @@ export default async function handler(req, res) {
 
     if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
       const solutionText = data.candidates[0].content.parts[0].text;
-      return.status(200).json({ solution: solutionText });
+      return res.status(200).json({ solution: solutionText });
     } else {
-      return.status(500).json({ error: 'Google API boş veya geçersiz format döndürdü: ' + JSON.stringify(data) });
+      return res.status(500).json({ error: 'Google API boş format döndürdü.' });
     }
 
   } catch (err) {
-    return.status(500).json({ error: 'Sunucu İşlem Hatası: ' + err.message });
+    return res.status(500).json({ error: 'Sunucu İşlem Hatası: ' + err.message });
   }
 }
