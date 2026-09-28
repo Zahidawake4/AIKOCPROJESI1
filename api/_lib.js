@@ -3,7 +3,7 @@
 const FIREBASE_WEB_API_KEY =
   process.env.FIREBASE_WEB_API_KEY || "AIzaSyCKnWNJ7klhbhPpnieqy55WNag-PaOYrUc";
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 
 // Firebase ID token'ı doğrular, geçerliyse kullanıcının uid'sini döndürür.
 // Böylece giriş yapmamış biri API anahtarını kullanamaz.
