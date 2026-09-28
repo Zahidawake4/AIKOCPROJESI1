@@ -1,14 +1,14 @@
 {
   "name": "aikocprojesi",
-  "version": "1.0.0",
-  "description": "YKS 2027 AI Coach Platform",
+  "version": "2.0.0",
+  "description": "YKS 2027 Pro - AI Koç ve Soru Çözüm Platformu",
   "type": "module",
-  "main": "index.html",
-  "scripts": {
-    "test": "echo \"Error: test specified\""
+  "engines": {
+    "node": ">=20"
   },
-  "keywords": [],
-  "author": "",
+  "scripts": {
+    "start": "vercel dev"
+  },
   "license": "ISC",
   "dependencies": {}
 }
