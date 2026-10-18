@@ -1,6 +1,6 @@
-import { requireUid } from "../../lib/firebase.js";
-import { route } from "../../lib/http.js";
-import { syncUser } from "../../lib/syncService.js";
+import { requireUid } from "./firebase.js";
+import { route } from "./http.js";
+import { syncUser } from "./syncService.js";
 
 // "Şimdi senkronize et" düğmesi
 export default route(["POST"], async (req, res) => {
