@@ -1,14 +1,14 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
-import { analyzeImage } from "./analyze.js";
+import { analyzeImage } from "./api/analyze.js";
 import { decrypt } from "./crypto.js";
 import { appendSection, downloadImage, extractImages, getDocument } from "./docs.js";
 import { db } from "./firebase.js";
-import { refreshAccessToken, TokenRevokedError } from "./googleAuth.js";
+import { refreshAccessToken, TokenRevokedError } from "./api/googleAuth.js";
 import { HttpError } from "./http.js";
-import { generateWeeklyPlan } from "./planner.js";
-import { renderSyncSection } from "./render.js";
+import { generateWeeklyPlan } from "./api/planner.js";
+import { renderSyncSection } from "./api/render.js";
 import type { ExtractedImage, VisionResult, WeeklyPlan } from "./types.js";
-import { recordSection, topWeaknesses } from "./weaknesses.js";
+import { recordSection, topWeaknesses } from "./api/weaknesses.js";
 
 export interface SyncSummary {
   found: number;
