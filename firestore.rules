@@ -2,16 +2,28 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Her kullanıcı sadece kendi verisini okuyup yazabilir
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-
-      match /questions/{questionId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
     }
 
-    // Diğer her şey kapalı
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      // Mevcut manuel soru arşivi (istemci yazar)
+      match /questions/{id} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Sunucunun (Admin SDK) yazdığı veriler: istemci SADECE okur
+      match /analyses/{id}     { allow read: if isOwner(uid); allow write: if false; }
+      match /weaknesses/{id}   { allow read: if isOwner(uid); allow write: if false; }
+      match /weeklyPlans/{id}  { allow read: if isOwner(uid); allow write: if false; }
+      match /docSync/{id}      { allow read: if isOwner(uid); allow write: if false; }
+      // syncedImages: hiçbir kural yok -> istemciye tamamen kapalı
+    }
+
+    // googleLinks (şifreli refresh token) dahil her şey varsayılan olarak kapalı.
+    // Admin SDK kuralları atlar, istemci erişemez.
     match /{document=**} {
       allow read, write: if false;
     }

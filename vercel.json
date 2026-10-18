@@ -1,7 +1,10 @@
 {
   "functions": {
-    "api/*.js": {
-      "maxDuration": 60
-    }
-  }
+    "api/*.js": { "maxDuration": 60 },
+    "api/sync/*.ts": { "maxDuration": 300 },
+    "api/cron/*.ts": { "maxDuration": 300 }
+  },
+  "crons": [
+    { "path": "/api/cron/sync-all", "schedule": "0 5 * * *" }
+  ]
 }
