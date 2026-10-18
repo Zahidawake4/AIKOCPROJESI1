@@ -1,10 +1,8 @@
 {
   "functions": {
-    "api/*.js": { "maxDuration": 60 },
-    "api/sync/*.ts": { "maxDuration": 300 },
-    "api/cron/*.ts": { "maxDuration": 300 }
+    "*.ts": { "maxDuration": 60 }
   },
   "crons": [
-    { "path": "/api/cron/sync-all", "schedule": "0 5 * * *" }
+    { "path": "/cron/sync-all", "schedule": "0 5 * * *" }
   ]
 }
