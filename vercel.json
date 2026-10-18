@@ -1,8 +1,0 @@
-{
-  "functions": {
-    "*.ts": { "maxDuration": 60 }
-  },
-  "crons": [
-    { "path": "/cron/sync-all", "schedule": "0 5 * * *" }
-  ]
-}
