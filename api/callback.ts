@@ -1,8 +1,8 @@
-import { encrypt, verifyState } from "../../lib/crypto.js";
-import { createNotebook } from "../../lib/docs.js";
-import { db } from "../../lib/firebase.js";
-import { exchangeCode } from "../../lib/googleAuth.js";
-import type { Req, Res } from "../../lib/types.js";
+import { encrypt, verifyState } from "../crypto.js";
+import { createNotebook } from "../docs.js";
+import { db } from "../firebase.js";
+import { exchangeCode } from "./googleAuth.js";
+import type { Req, Res } from "../types.js";
 
 const q = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 

@@ -1,10 +1,10 @@
-import { db } from "./firebase.js";
-import { generateJson } from "./gemini.js";
-import { PLAN_SCHEMA, PLAN_SYSTEM } from "./prompts.js";
+import { db } from "../firebase.js";
+import { generateJson } from "../gemini.js";
+import { PLAN_SCHEMA, PLAN_SYSTEM } from "../prompts.js";
 import { topWeaknesses } from "./weaknesses.js";
-import type { PlanDay, PlanTask, WeeklyPlan } from "./types.js";
+import type { PlanDay, PlanTask, WeeklyPlan } from "../types.js";
 
-const DAYS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
+const DAYS = ["Pazartesi", "Sali", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
 const ACTIVITIES = ["konu_calismasi", "soru_cozumu", "tekrar", "deneme", "hata_defteri"];
 
 // Türkiye saatine göre haftanın pazartesi günü (YYYY-MM-DD)

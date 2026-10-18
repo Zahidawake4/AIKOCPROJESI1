@@ -1,4 +1,4 @@
-import { env } from "./env.js";
+import { env } from "../env.js";
 
 // Sadece drive.file: uygulamanın KENDİ oluşturduğu dosyalara erişir.
 // Docs API de bu kapsamı kabul eder, böylece öğrencinin tüm Drive'ına erişmeyiz.

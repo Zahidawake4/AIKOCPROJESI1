@@ -1,7 +1,7 @@
-import { decrypt } from "../../lib/crypto.js";
-import { db, requireUid } from "../../lib/firebase.js";
-import { revokeToken } from "../../lib/googleAuth.js";
-import { route } from "../../lib/http.js";
+import { decrypt } from "../crypto.js";
+import { db, requireUid } from "../firebase.js";
+import { revokeToken } from "./googleAuth.js";
+import { route } from "../http.js";
 
 // Bağlantıyı keser: izni Google'da iptal eder, şifreli token'ı siler. Docs belgesi ve analizler silinmez.
 export default route(["POST"], async (req, res) => {

@@ -1,4 +1,4 @@
-import type { DocLine, VisionResult, WeeklyPlan } from "./types.js";
+import type { DocLine, VisionResult, WeeklyPlan } from "../types.js";
 import type { WeaknessDoc } from "./weaknesses.js";
 
 const ACTIVITY_LABEL: Record<string, string> = {

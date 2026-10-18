@@ -1,7 +1,7 @@
-import { env } from "../../lib/env.js";
-import { db } from "../../lib/firebase.js";
-import { HttpError, route } from "../../lib/http.js";
-import { syncUser } from "../../lib/syncService.js";
+import { env } from "../env.js";
+import { db } from "../firebase.js";
+import { HttpError, route } from "../http.js";
+import { syncUser } from "../syncService.js";
 
 // Vercel Cron: CRON_SECRET tanımlıysa "Authorization: Bearer <secret>" ile çağırır
 export default route(["GET"], async (req, res) => {

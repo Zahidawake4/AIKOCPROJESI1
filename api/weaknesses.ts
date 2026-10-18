@@ -1,6 +1,7 @@
+// @ts-ignore
 import { FieldValue } from "firebase-admin/firestore";
-import { db } from "./firebase.js";
-import type { SectionResult } from "./types.js";
+import { db } from "../firebase.js";
+import type { SectionResult } from "../types.js";
 
 export interface WeaknessDoc {
   subject: string;

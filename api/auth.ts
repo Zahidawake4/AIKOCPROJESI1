@@ -1,7 +1,7 @@
-import { signState } from "../../lib/crypto.js";
-import { requireUid } from "../../lib/firebase.js";
-import { buildAuthUrl } from "../../lib/googleAuth.js";
-import { route } from "../../lib/http.js";
+import { signState } from "../crypto.js";
+import { requireUid } from "../firebase.js";
+import { buildAuthUrl } from "./googleAuth.js";
+import { route } from "../http.js";
 
 // İstemci Bearer token ile çağırır, dönen URL'ye yönlenir (tarayıcı yönlendirmesi header taşıyamaz)
 export default route(["POST"], async (req, res) => {

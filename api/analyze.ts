@@ -1,11 +1,11 @@
-import { generateJson } from "./gemini.js";
-import { VISION_SCHEMA, VISION_SYSTEM } from "./prompts.js";
-import { slug } from "./taxonomy.js";
+import { generateJson } from "../gemini.js";
+import { VISION_SCHEMA, VISION_SYSTEM } from "../prompts.js";
+import { slug } from "../taxonomy.js";
 import {
   ERROR_TYPES, IMAGE_TYPES,
   type DownloadedImage, type ErrorPattern, type ErrorType,
   type ImageType, type SectionResult, type VisionResult,
-} from "./types.js";
+} from "../types.js";
 
 const toInt = (v: unknown, max = 500): number | null =>
   typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= max ? Math.round(v) : null;
