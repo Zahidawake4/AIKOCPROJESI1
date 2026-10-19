@@ -1,21 +1,16 @@
 {
   "compilerOptions": {
-    "target": "es2022",
+    "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["es2022"],
+    "lib": ["ES2022"],
+    "types": ["node"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "allowImportingTsExtensions": false,
-    "moduleDetection": "force",
-    "paths": {
-      "@/*": ["./*"],
-      "@api/*": ["./api/*"]
-    }
+    "noEmit": true
   },
-  "include": ["api/**/*", "*.ts"],
-  "exclude": ["node_modules", ".vercel"]
+  "include": ["api/**/*", "lib/**/*"],
+  "exclude": ["node_modules", ".vercel", "public"]
 }

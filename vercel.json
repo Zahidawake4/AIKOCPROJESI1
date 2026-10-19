@@ -1,0 +1,14 @@
+{
+  "outputDirectory": "public",
+  "functions": {
+    "api/solve.ts": { "maxDuration": 60 },
+    "api/coach.ts": { "maxDuration": 60 },
+    "api/plan.ts": { "maxDuration": 60 },
+    "api/google/*.ts": { "maxDuration": 30 },
+    "api/sync/*.ts": { "maxDuration": 60 },
+    "api/cron/*.ts": { "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/cron/sync-all", "schedule": "0 5 * * *" }
+  ]
+}

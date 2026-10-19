@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YKS 2027 Pro - AI Koç</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+  <!-- Giriş -->
+  <div id="auth-modal">
+    <div class="modal-content">
+      <i class="fa-solid fa-graduation-cap" style="font-size:3rem;color:var(--primary);margin-bottom:1rem;"></i>
+      <h2>YKS 2027 Pro</h2>
+      <p class="muted" style="margin:1rem 0;">Soru çözümü, net takibi ve kişisel koçluk için Google ile giriş yap.</p>
+      <button class="google-btn" id="google-login-btn"><i class="fa-brands fa-google" style="color:#ea4335;"></i> Google ile Giriş Yap</button>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div>
+      <div class="sidebar-header"><i class="fa-solid fa-robot"></i> YKS 2027 Pro</div>
+      <ul class="sidebar-menu">
+        <li class="menu-section-title">Menü</li>
+        <li><button class="menu-btn active" data-tab="solver" onclick="switchTab('solver', this)"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Soru Çözücü</button></li>
+        <li><button class="menu-btn" data-tab="wizard" onclick="switchTab('wizard', this)"><i class="fa-solid fa-calculator"></i> Net Sihirbazı</button></li>
+        <li><button class="menu-btn" data-tab="history" onclick="switchTab('history', this)"><i class="fa-solid fa-clock-rotate-left"></i> Çözülen Sorular</button></li>
+        <li><button class="menu-btn" data-tab="docs" onclick="switchTab('docs', this)"><i class="fa-brands fa-google-drive"></i> Google Docs & Analiz</button></li>
+        <li><button class="menu-btn" data-tab="coach" onclick="switchTab('coach', this)"><i class="fa-solid fa-brain"></i> AI Koç & Program</button></li>
+        <li><button class="menu-btn" data-tab="report" onclick="switchTab('report', this)"><i class="fa-solid fa-file-contract"></i> Aylık Rapor</button></li>
+
+        <li class="menu-section-title" style="margin-top:1rem;">Sınav bağlamı</li>
+        <li style="padding:0 .5rem;display:flex;gap:1rem;font-size:.9rem;">
+          <label style="cursor:pointer;"><input type="radio" name="examContext" value="TYT" checked> TYT</label>
+          <label style="cursor:pointer;"><input type="radio" name="examContext" value="AYT"> AYT</label>
+        </li>
+
+        <li class="menu-section-title" style="margin-top:1rem;">Anlatım kademesi</li>
+        <li style="padding:0 .5rem;">
+          <div class="level-selector">
+            <button class="level-btn active" data-level="1" onclick="selectLevel(1)">1. Kademe (Temel)</button>
+            <button class="level-btn" data-level="2" onclick="selectLevel(2)">2. Kademe (İleri AYT)</button>
+            <button class="level-btn" data-level="3" onclick="selectLevel(3)">3. Kademe (Mühendislik)</button>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="sidebar-footer">
+      <span id="sidebar-user-email">Oturum açılmadı</span>
+      <span style="font-size:.75rem;color:var(--success);">● Sistem hazır</span>
+    </div>
+  </aside>
+
+  <div class="main-container">
+    <header>
+      <div style="font-weight:600;color:var(--text-muted);" id="headerTitle">AI Soru Çözücü</div>
+      <div class="user-panel">
+        <span class="badge" id="free-badge">Kalan hak: <strong>4</strong></span>
+        <button class="icon-btn" onclick="logoutFirebase()" title="Çıkış yap"><i class="fa-solid fa-right-from-bracket"></i></button>
+      </div>
+    </header>
+
+    <div class="content-body">
+
+      <!-- 1. SORU ÇÖZÜCÜ -->
+      <div id="tab-solver" class="tab-content active">
+        <div class="card">
+          <h3><i class="fa-solid fa-cloud-arrow-up"></i> Soru fotoğrafı yükle</h3>
+          <div class="upload-area" id="uploadArea" onclick="document.getElementById('file-input').click()">
+            <i class="fa-solid fa-image" style="font-size:2rem;color:var(--primary);margin-bottom:.5rem;"></i>
+            <p>Fotoğraf yüklemek için tıkla veya sürükle</p>
+            <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="handleFileSelect(event)">
+            <img id="imagePreview" alt="Önizleme">
+          </div>
+
+          <label class="field" for="outcomeSelect">Bu soruda ne oldu? (Koçun seni tanısın)</label>
+          <select id="outcomeSelect">
+            <option value="yanlis">Yanlış yaptım</option>
+            <option value="bos">Boş bıraktım</option>
+            <option value="bilmiyorum">Konuyu hiç bilmiyorum</option>
+            <option value="yavas">Doğru yaptım ama çok uzun sürdü</option>
+            <option value="merak">Sadece çözümü merak ettim</option>
+          </select>
+
+          <label class="field" for="studentNote">Nerede takıldın / cevabın neydi? (isteğe bağlı)</label>
+          <textarea id="studentNote" maxlength="600" placeholder="Örn: Ben 12 buldum, işaret hatası yaptığımı düşünüyorum..."></textarea>
+
+          <div class="voice-section">
+            <span class="muted" id="voiceStatus"><i class="fa-solid fa-microphone-lines"></i> Sesli komut hazır (örn: "soruyu çöz", "AYT", "ikinci kademe")</span>
+            <button class="mic-btn" id="micBtn" onclick="toggleVoiceInput()"><i class="fa-solid fa-microphone"></i> Sesli komut ver</button>
+          </div>
+
+          <button class="btn" id="solveBtn" onclick="solveQuestion()"><i class="fa-solid fa-bolt"></i> Soruyu analiz et ve çöz</button>
+          <p class="muted" style="margin-top:.75rem;font-size:.8rem;">AI çözümleri hatalı olabilir; sonucu kendi çözümünle ve öğretmeninle doğrula.</p>
+        </div>
+
+        <div class="card" id="solutionSection" style="display:none;">
+          <h3 id="detectedTopic" style="color:var(--primary);">Konu: analiz ediliyor...</h3>
+          <div id="solutionText" class="solution-text"></div>
+        </div>
+      </div>
+
+      <!-- 2. NET SİHİRBAZI -->
+      <div id="tab-wizard" class="tab-content">
+        <div class="card">
+          <h3><i class="fa-solid fa-calculator"></i> Net sihirbazı</h3>
+          <div class="pill-group" style="margin:1rem 0;">
+            <button class="pill active" id="pill-TYT" onclick="setNetKind('TYT')">TYT</button>
+            <button class="pill" id="pill-AYT" onclick="setNetKind('AYT')">AYT</button>
+          </div>
+          <p class="muted">4 yanlış 1 doğruyu götürür. Soru sayılarını ÖSYM'nin güncel kılavuzundan kontrol et.</p>
+          <table>
+            <thead><tr><th>Ders</th><th>Doğru</th><th>Yanlış</th><th>Net</th></tr></thead>
+            <tbody id="netTableBody"></tbody>
+          </table>
+          <div class="total-box"><h4>Toplam <span id="netKindLabel">TYT</span> neti: <span id="totalNet" style="color:var(--primary);">0.00</span></h4></div>
+          <button class="btn" onclick="saveNetResult()"><i class="fa-solid fa-floppy-disk"></i> Bu denemeyi kaydet</button>
+          <div id="netChart" style="margin-top:1.5rem;"></div>
+          <div id="netHistoryBox" style="margin-top:1rem;"></div>
+        </div>
+      </div>
+
+      <!-- 3. GEÇMİŞ -->
+      <div id="tab-history" class="tab-content">
+        <div class="card">
+          <h3><i class="fa-solid fa-clock-rotate-left"></i> Çözülen sorular</h3>
+          <p class="muted" style="margin:.5rem 0 1rem;">Bir soruya tıklayarak çözümünü tekrar aç.</p>
+          <div id="historyListContainer"><p class="muted">Henüz kayıtlı soru yok.</p></div>
+        </div>
+      </div>
+
+      <!-- 4. GOOGLE DOCS -->
+      <div id="tab-docs" class="tab-content">
+        <div class="card">
+          <h3><i class="fa-brands fa-google-drive"></i> Google Docs ile otomatik analiz</h3>
+          <p class="muted" style="margin:.5rem 0 1rem;">Test, deneme karnesi veya soru bankası fotoğraflarını Google Docs defterine ekle; koçun okuyup analiz eder, haftalık programını hazırlar.</p>
+          <div id="docsStatus"></div>
+        </div>
+        <div class="card">
+          <h4>Okunan görseller</h4>
+          <div id="docsAnalyses" style="margin-top:1rem;"><p class="muted">Henüz analiz yok.</p></div>
+        </div>
+      </div>
+
+      <!-- 5. KOÇ -->
+      <div id="tab-coach" class="tab-content">
+        <div class="card">
+          <h4><i class="fa-solid fa-bullseye"></i> Hedefin</h4>
+          <p class="muted" style="margin:.5rem 0 1rem;">Koç ve haftalık program bu bilgilere göre kişiselleşir.</p>
+          <label class="field" for="goalInput">Hedef bölüm / üniversite</label>
+          <input type="text" id="goalInput" maxlength="120" placeholder="Örn: Bilgisayar Mühendisliği, ODTÜ">
+          <label class="field" for="hoursInput">Günlük çalışma saati</label>
+          <input type="number" class="wide" id="hoursInput" min="1" max="16" step="0.5" value="4">
+          <button class="btn btn-secondary" onclick="saveProfile()"><i class="fa-solid fa-floppy-disk"></i> Kaydet</button>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h4><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> Kronik eksikler</h4>
+            <p class="muted" style="margin:.5rem 0 1rem;">Hata oranı ve tekrar sayısına göre.</p>
+            <div id="weakTopicList"><p class="muted">Yeterli veri yok.</p></div>
+          </div>
+          <div class="card">
+            <h4><i class="fa-solid fa-brain"></i> Koç yorumu</h4>
+            <div id="coachAdviceBox" class="solution-text muted" style="margin:1rem 0;font-size:.9rem;">Birkaç soru çözdükten sonra koç yorumunu oluşturabilirsin.</div>
+            <button class="btn" id="coachBtn" onclick="generateCoachAdvice()"><i class="fa-solid fa-wand-magic-sparkles"></i> Koç yorumu oluştur</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4><i class="fa-solid fa-calendar-week"></i> Haftalık program</h4>
+          <div id="planBox" style="margin:1rem 0;"><p class="muted">Henüz program yok.</p></div>
+          <button class="btn" id="planBtn" onclick="generatePlan()"><i class="fa-solid fa-wand-magic-sparkles"></i> Haftalık program üret</button>
+        </div>
+      </div>
+
+      <!-- 6. RAPOR -->
+      <div id="tab-report" class="tab-content">
+        <div class="card">
+          <h3><i class="fa-solid fa-calendar-days"></i> Aylık gelişim raporu</h3>
+          <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:1rem;">
+            <div class="stat-row"><span>Son 30 günde çözülen soru</span><strong id="reportTotalCount" style="color:var(--primary);">0</strong></div>
+            <div class="stat-row"><span>En çok hata yapılan konu</span><strong id="reportTopTopic" style="color:var(--warning);">Veri yok</strong></div>
+            <div class="stat-row"><span>Okunan görsel (Docs)</span><strong id="reportDocsCount" style="color:var(--success);">0</strong></div>
+            <button class="btn btn-secondary" onclick="generateMonthlyReport()"><i class="fa-solid fa-file-arrow-down"></i> Raporu indir (.txt)</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCKnWNJ7klhbhPpnieqy55WNag-PaOYrUc",
+      authDomain: "aikocprojesi.firebaseapp.com",
+      projectId: "aikocprojesi",
+      storageBucket: "aikocprojesi.firebasestorage.app",
+      messagingSenderId: "15116982306",
+      appId: "1:15116982306:web:cf981bfeebd839bbfe527b"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  </script>
+  <script src="script.js"></script>
+</body>
+</html>

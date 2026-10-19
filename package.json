@@ -1,21 +1,18 @@
 {
   "name": "aikocprojesi",
-  "version": "3.0.0",
-  "description": "YKS 2027 Pro - AI Koç (Google Docs + Vision analiz modülü)",
+  "version": "4.0.0",
+  "description": "YKS 2027 Pro - AI Koç ve Soru Çözüm Platformu",
   "type": "module",
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": { "node": "22.x" },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "start": "vercel dev"
+    "typecheck": "tsc --noEmit"
   },
   "license": "ISC",
   "dependencies": {
     "firebase-admin": "^12.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43",
+    "@types/node": "^22.0.0",
     "typescript": "^5.0.0"
   }
 }
