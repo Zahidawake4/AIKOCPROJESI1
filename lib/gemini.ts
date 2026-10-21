@@ -15,7 +15,7 @@ interface CallOptions {
   schema?: object;
   temperature?: number;
   maxOutputTokens?: number;
-  thinkingBudget?: number; // sadece 2.5+ modellerde uygulanır
+  thinkingBudget?: number; // sadece 2.5+ ve 3+ modellerde uygulanır
 }
 
 interface RawResult { text: string; finishReason?: string; blockReason?: string; model: string }
@@ -98,9 +98,9 @@ async function callModel(model: string, o: CallOptions): Promise<RawResult> {
   throw new GeminiError("unavailable", 503, "Gemini yanıt vermedi.");
 }
 
-// Ayarlı model bulunamazsa (404) yedek modellere geç
+// Ayarlı model bulunamazsa (404) güncel yedek modellere geç (gemini-2.0-flash kaldırıldı, gemini-3.8-flash ve 2.5-flash eklendi)
 async function callGemini(o: CallOptions): Promise<RawResult> {
-  const models = [...new Set([env.geminiModel, "gemini-2.5-flash", "gemini-2.0-flash"])];
+  const models = [...new Set([env.geminiModel, "gemini-3.8-flash", "gemini-2.5-flash"])];
   let lastModelError: GeminiError | null = null;
   for (const m of models) {
     try { return await callModel(m, o); }
@@ -138,12 +138,12 @@ function repairTruncated(s: string): string {
   }
   let out = s;
   if (inString) out += '"';
-  out = out.replace(/[,:\s]+$/, "");
+  out = out.replace(/[,:\s]+\$/, "");
   return out + stack.reverse().join("");
 }
 
 export function parseJsonLoose(text: string): unknown {
-  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\$/i, "").trim();
   try { return JSON.parse(cleaned); } catch { /* devam */ }
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
