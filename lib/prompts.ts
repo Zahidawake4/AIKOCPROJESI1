@@ -19,7 +19,9 @@ ADIM 2 - HER DERS/KONU İÇİN BİR "section" ÜRET:
   * deneme_karnesi: basılı sayıları aynen oku.
   * test_sayfasi / soru_bankasi_sayfasi: doğru/yanlış ancak cevap anahtarı, ✓/✗ işareti, kırmızı düzeltme veya öğrencinin açık notu varsa belirlenebilir. Aksi halde null bırak ve issues'a "doğru/yanlış belirlenemedi" yaz.
 - wrongQuestionNumbers: yanlış olduğu GÖRÜNEN soru numaraları (yoksa boş dizi).
-- errorPatterns: yanlışlarda görünen hata kalıpları. Sadece kanıt varsa yaz (örn. işaret hatası, birim dönüşümü unutma, soruyu yanlış okuma, formül bilmeme). type değerleri: ${ERROR_TYPES.join(" | ")}. Kanıt yoksa "belirsiz" kullan veya boş bırak.
+- blankQuestionNumbers: boş bırakıldığı GÖRÜNEN soru numaraları (yoksa boş dizi).
+- Aynı görselde birden fazla konu varsa her konu için ayrı section üret ve soruları konularına göre dağıt.
+- errorPatterns: yanlış/boş sorulardaki hata nedenleri. Sadece kanıt varsa yaz (örn. işaret hatası, birim dönüşümü unutma, soruyu yanlış okuma, formülü bilmeme). Neden türleri: bilgi_eksigi (konuyu bilmiyor), kavram_eksigi (kavramı yanlış anlamış), formul_unutma (formülü unutmuş/yanlış formül), islem_hatasi (işlem/hesap hatası), dikkat_hatasi (yanlış okuma, işaret, şık karıştırma), yorum_hatasi (soru kökünü/metni yanlış yorumlama), sure_yetmedi (süre yetmedi). type değerleri: ${ERROR_TYPES.join(" | ")}. Kanıt yoksa "belirsiz" kullan veya boş bırak.
 - evidence: bu satırı görselde neye dayanarak çıkardığını tek cümlede yaz (örn. "karnede Matematik satırı: 28 D, 6 Y, 6 B").
 
 ADIM 3 - GÜVEN DEĞERLENDİRMESİ:
@@ -57,6 +59,7 @@ export const VISION_SCHEMA = {
           blank: INT,
           totalQuestions: INT,
           wrongQuestionNumbers: { type: "ARRAY", items: { type: "INTEGER" } },
+          blankQuestionNumbers: { type: "ARRAY", items: { type: "INTEGER" } },
           errorPatterns: {
             type: "ARRAY",
             items: {
@@ -85,7 +88,7 @@ Girdi JSON'u: hedef, günlük çalışma süresi (dakika), kronik zayıf konular
 KURALLAR:
 1. Tam 7 gün üret (Pazartesi-Pazar). Her günün toplam süresi günlük süreyi AŞMASIN; Pazar günü daha hafif olsun.
 2. Öncelik: chronicScore'u yüksek konular. Aynı konuyu hafta içine yay (aralıklı tekrar), hepsini tek güne yığma.
-3. Hata türüne göre aktivite seç: kavram_eksigi/bilgi_eksigi -> konu_calismasi + soru_cozumu; islem_hatasi/dikkat_hatasi -> soru_cozumu + hata_defteri; sure_yetmedi -> süreli soru_cozumu.
+3. Hata türüne göre aktivite seç: kavram_eksigi/bilgi_eksigi -> konu_calismasi + soru_cozumu; formul_unutma -> tekrar (formül kartı) + soru_cozumu; yorum_hatasi -> soru_cozumu (soru kökü analizi); islem_hatasi/dikkat_hatasi -> soru_cozumu + hata_defteri; sure_yetmedi -> süreli soru_cozumu.
 4. Haftada en fazla 1 deneme ve 1 tekrar günü planla.
 5. Veri azsa abartılı çıkarım yapma; summary içinde bunu dürüstçe söyle.
 6. Her görevde "why" alanına bu görevin hangi veriye dayandığını kısa yaz.
@@ -178,5 +181,5 @@ Sana öğrencinin verileri JSON olarak verilecek: hedef, günlük çalışma sü
 KURALLAR:
 1. LaTeX kullanma, düz Türkçe yaz. Başlıkları **kalın** yap.
 2. Sadece verilen verilere dayan. Veri azsa bunu dürüstçe söyle, abartılı çıkarım yapma.
-3. Bölümler: **Genel Durum** (2-3 cümle), **En Zayıf 3 Konu** (neden zayıf + nasıl çalışmalı), **Bu Hafta Odak**, **Hedefe Uzaklık** (hedef ve net verisi varsa), **Motivasyon** (1-2 cümle).
+3. Bölümler: **Genel Durum** (2-3 cümle), **En Zayıf 3 Konu** (hata nedenleri: bilgi eksikliği, dikkat hatası, formül unutma vb. dağılımına göre neden zayıf + nasıl çalışmalı), **Bu Hafta Odak**, **Hedefe Uzaklık** (hedef ve net verisi varsa), **Motivasyon** (1-2 cümle).
 4. En fazla 300 kelime.`;

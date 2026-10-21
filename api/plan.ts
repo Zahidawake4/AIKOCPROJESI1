@@ -1,25 +1,28 @@
 import { db, requireUid } from "../lib/firebase.js";
-import { GeminiError } from "../lib/gemini.js";
-import { HttpError, route } from "../lib/http.js";
+import { route } from "../lib/http.js";
 import { generateWeeklyPlan, weekStartTR } from "../lib/planner.js";
 
-// Google Docs bağlı olmasa da haftalık program üretir (veriler Firestore'dan okunur)
+// Haftalık program: AI başarısız olsa bile yedek planla HER ZAMAN bir plan döner.
 export default route(["POST"], async (req, res) => {
   const uid = await requireUid(req);
   const database = db();
 
-  const existing = (await database.doc(`users/${uid}/weeklyPlans/${weekStartTR()}`).get()).data();
-  if (existing?.generatedAt && Date.now() - Date.parse(existing.generatedAt) < 60_000) {
-    res.status(200).json({ plan: existing, cached: true });
-    return;
-  }
-
-  const profile = (await database.doc(`users/${uid}`).get()).data() ?? {};
+  // 60 sn içinde tekrar istenirse mevcut planı döndür (gereksiz AI çağrısı olmasın)
   try {
-    const plan = await generateWeeklyPlan(uid, { goal: profile.goal, dailyHours: profile.dailyHours });
-    res.status(200).json({ plan, cached: false });
-  } catch (e) {
-    console.error("Plan hatası:", e);
-    throw new HttpError(e instanceof GeminiError && e.status === 429 ? 429 : 502, "Haftalık program şu an üretilemedi, biraz sonra tekrar dene.");
-  }
+    const existing = (await database.doc(`users/${uid}/weeklyPlans/${weekStartTR()}`).get()).data();
+    if (existing?.generatedAt && Date.now() - Date.parse(existing.generatedAt) < 60_000) {
+      res.status(200).json({ plan: existing, source: existing.source ?? "ai", note: existing.note ?? null, cached: true });
+      return;
+    }
+  } catch (e) { console.error("Plan önbellek okuma:", e); }
+
+  let profile: Record<string, unknown> = {};
+  try { profile = (await database.doc(`users/${uid}`).get()).data() ?? {}; }
+  catch (e) { console.error("Profil okuma:", e); }
+
+  const result = await generateWeeklyPlan(uid, {
+    goal: typeof profile.goal === "string" ? profile.goal : undefined,
+    dailyHours: Number(profile.dailyHours) || 4,
+  });
+  res.status(200).json({ ...result, cached: false });
 });

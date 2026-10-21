@@ -1,6 +1,6 @@
 {
   "name": "aikocprojesi",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "YKS 2027 Pro - AI Koç ve Soru Çözüm Platformu",
   "type": "module",
   "engines": { "node": "22.x" },

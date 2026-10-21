@@ -30,6 +30,8 @@
         <li class="menu-section-title">Menü</li>
         <li><button class="menu-btn active" data-tab="solver" onclick="switchTab('solver', this)"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Soru Çözücü</button></li>
         <li><button class="menu-btn" data-tab="wizard" onclick="switchTab('wizard', this)"><i class="fa-solid fa-calculator"></i> Net Sihirbazı</button></li>
+        <li><button class="menu-btn" data-tab="analyze" onclick="switchTab('analyze', this)"><i class="fa-solid fa-camera"></i> Deneme Analizi</button></li>
+        <li><button class="menu-btn" data-tab="topics" onclick="switchTab('topics', this)"><i class="fa-solid fa-chart-column"></i> Konu & Hata Analizi</button></li>
         <li><button class="menu-btn" data-tab="history" onclick="switchTab('history', this)"><i class="fa-solid fa-clock-rotate-left"></i> Çözülen Sorular</button></li>
         <li><button class="menu-btn" data-tab="docs" onclick="switchTab('docs', this)"><i class="fa-brands fa-google-drive"></i> Google Docs & Analiz</button></li>
         <li><button class="menu-btn" data-tab="coach" onclick="switchTab('coach', this)"><i class="fa-solid fa-brain"></i> AI Koç & Program</button></li>
@@ -53,7 +55,7 @@
     </div>
     <div class="sidebar-footer">
       <span id="sidebar-user-email">Oturum açılmadı</span>
-      <span style="font-size:.75rem;color:var(--success);">● Sistem hazır</span>
+      <button class="link-btn" onclick="runHealthCheck()"><i class="fa-solid fa-stethoscope"></i> Sistem testi</button>
     </div>
   </aside>
 
@@ -106,6 +108,43 @@
         </div>
       </div>
 
+      <!-- DENEME ANALİZİ (fotoğraf) -->
+      <div id="tab-analyze" class="tab-content">
+        <div class="card">
+          <h3><i class="fa-solid fa-camera"></i> Fotoğraftan deneme analizi</h3>
+          <p class="muted" style="margin:.5rem 0 1rem;">Deneme karnesi veya çözdüğün test sayfalarının fotoğraflarını yükle. Yapay zekâ ders/konu, doğru-yanlış-boş sayıları ve hata nedenlerini çıkarır. Sınav bağlamı için soldaki TYT/AYT seçimi kullanılır.</p>
+          <div class="upload-area" id="analyzeArea" onclick="document.getElementById('analyze-files').click()">
+            <i class="fa-solid fa-images" style="font-size:2rem;color:var(--primary);margin-bottom:.5rem;"></i>
+            <p>Bir veya birkaç fotoğraf seç ya da sürükle</p>
+            <input type="file" id="analyze-files" accept="image/*" multiple style="display:none;" onchange="handleAnalyzeFiles(event)">
+          </div>
+          <div id="analyzeQueue"></div>
+          <button class="btn" id="analyzeBtn" onclick="runAnalysisBatch()" disabled><i class="fa-solid fa-magnifying-glass-chart"></i> Seçilenleri analiz et</button>
+          <p class="muted" style="margin-top:.75rem;font-size:.8rem;">Günde en fazla 20 görsel. Okuma güveni düşük sonuçlar "Kontrol et" olarak işaretlenir; sayıları düzeltip onayladığında istatistiğe eklenir. AI hatalı okuyabilir.</p>
+        </div>
+        <div class="card">
+          <h4>Analizlerin</h4>
+          <div id="uploadAnalyses" style="margin-top:1rem;"><p class="muted">Henüz analiz yok.</p></div>
+        </div>
+      </div>
+
+      <!-- KONU & HATA ANALİZİ -->
+      <div id="tab-topics" class="tab-content">
+        <div class="card">
+          <h3><i class="fa-solid fa-chart-column"></i> Konu konu eksik ve hata nedeni analizi</h3>
+          <p class="muted" style="margin:.5rem 0 1rem;">Çözdüğün sorulardan ve fotoğraf analizlerinden toplanan verilerle hangi konularda neden hata yaptığını gösterir.</p>
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="reportBtn" onclick="loadReport()"><i class="fa-solid fa-rotate"></i> Raporu yenile</button>
+            <button class="btn" id="aiReportBtn" onclick="generateReportAdvice()"><i class="fa-solid fa-wand-magic-sparkles"></i> AI açıklaması oluştur</button>
+          </div>
+        </div>
+        <div id="reportBox"><div class="card"><p class="muted">Rapor yükleniyor...</p></div></div>
+        <div class="card" id="reportAiCard" style="display:none;">
+          <h4><i class="fa-solid fa-brain"></i> Koç açıklaması</h4>
+          <div id="reportAiText" class="solution-text" style="margin-top:.75rem;"></div>
+        </div>
+      </div>
+
       <!-- 2. NET SİHİRBAZI -->
       <div id="tab-wizard" class="tab-content">
         <div class="card">
@@ -143,7 +182,7 @@
           <div id="docsStatus"></div>
         </div>
         <div class="card">
-          <h4>Okunan görseller</h4>
+          <h4>Docs'tan okunan görseller</h4>
           <div id="docsAnalyses" style="margin-top:1rem;"><p class="muted">Henüz analiz yok.</p></div>
         </div>
       </div>
@@ -193,6 +232,14 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <div id="healthModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)closeHealth()">
+    <div class="modal-box">
+      <h3 style="margin-bottom:.75rem;"><i class="fa-solid fa-stethoscope"></i> Sistem testi</h3>
+      <div id="healthBody" class="solution-text" style="font-size:.9rem;"></div>
+      <button class="btn btn-secondary" style="margin-top:1rem;" onclick="closeHealth()">Kapat</button>
     </div>
   </div>
 

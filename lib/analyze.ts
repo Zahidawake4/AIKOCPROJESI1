@@ -12,6 +12,13 @@ const toInt = (v: unknown, max = 500): number | null =>
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+function questionNumbers(v: unknown): number[] {
+  return (Array.isArray(v) ? v : [])
+    .map((n) => toInt(n, 200))
+    .filter((n): n is number => n !== null && n > 0)
+    .slice(0, 60);
+}
+
 function normalizeSection(raw: Record<string, unknown>, issues: string[]): SectionResult | null {
   const subject = typeof raw.subject === "string" ? raw.subject.trim().slice(0, 60) : "";
   if (!subject) return null;
@@ -34,11 +41,6 @@ function normalizeSection(raw: Record<string, unknown>, issues: string[]): Secti
     .filter((p) => p.description)
     .slice(0, 5);
 
-  const numbers = (Array.isArray(raw.wrongQuestionNumbers) ? raw.wrongQuestionNumbers : [])
-    .map((n) => toInt(n, 200))
-    .filter((n): n is number => n !== null && n > 0)
-    .slice(0, 60);
-
   return {
     subject,
     subjectKey: slug(subject),
@@ -47,7 +49,8 @@ function normalizeSection(raw: Record<string, unknown>, issues: string[]): Secti
     correct, wrong, blank, totalQuestions,
     // Net'i modele bırakmayız: sayılardan biz hesaplarız
     net: correct !== null && wrong !== null ? round2(correct - wrong / 4) : null,
-    wrongQuestionNumbers: numbers,
+    wrongQuestionNumbers: questionNumbers(raw.wrongQuestionNumbers),
+    blankQuestionNumbers: questionNumbers(raw.blankQuestionNumbers),
     errorPatterns: patterns,
     evidence: typeof raw.evidence === "string" ? raw.evidence.slice(0, 300) : "",
   };
@@ -80,16 +83,17 @@ export function normalizeVision(raw: unknown): VisionResult {
   };
 }
 
-export function analyzeImage(img: DownloadedImage): Promise<VisionResult> {
+export function analyzeImage(img: DownloadedImage, hint?: { exam?: string }): Promise<VisionResult> {
   return generateJson<VisionResult>({
     system: VISION_SYSTEM,
     parts: [
-      { text: "Bu görseli kurallara göre analiz et." },
+      { text: `${hint?.exam ? `Sınav bağlamı ipucu: ${hint.exam}. ` : ""}Bu görseli kurallara göre analiz et.` },
       { inlineData: { mimeType: img.mimeType, data: img.base64 } },
     ],
     schema: VISION_SCHEMA,
     validate: normalizeVision,
     temperature: 0.1,
+    maxOutputTokens: 8192,
     thinkingBudget: 1024,
   });
 }

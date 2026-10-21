@@ -112,3 +112,23 @@ table input[type="number"] { width: 60px; background: var(--bg-dark); border: 1p
   .content-body { padding: 1rem; }
   header { padding: 1rem; }
 }
+
+/* ---- Yeni bileşenler ---- */
+.link-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: .85rem; text-align: left; padding: 0; }
+.link-btn:hover { color: var(--text-main); }
+.modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,.85); display: flex; align-items: center; justify-content: center; z-index: 1500; }
+.modal-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.5rem; max-width: 460px; width: 92%; max-height: 85vh; overflow-y: auto; }
+.chk-row { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem 0; border-bottom: 1px solid var(--border); font-size: .88rem; }
+.thumb-row { display: flex; align-items: center; gap: .75rem; padding: .5rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: .5rem; margin-bottom: .5rem; font-size: .85rem; }
+.thumb-row img { width: 44px; height: 44px; object-fit: cover; border-radius: .35rem; }
+.thumb-row .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cause-bar { margin-bottom: .8rem; font-size: .88rem; }
+.cause-bar .bar { height: 8px; background: var(--bg-dark); border-radius: 999px; margin-top: .3rem; overflow: hidden; }
+.cause-bar .bar > span { display: block; height: 100%; background: var(--primary); }
+.topic-card { background: var(--bg-dark); border: 1px solid var(--border); border-radius: .5rem; padding: .85rem 1rem; margin-bottom: .6rem; }
+.topic-card summary { cursor: pointer; display: flex; justify-content: space-between; gap: 1rem; font-size: .92rem; }
+.topic-card .inner { margin-top: .75rem; font-size: .85rem; color: var(--text-muted); line-height: 1.6; }
+.confirm-grid { display: grid; grid-template-columns: 1fr auto auto auto; gap: .4rem .5rem; align-items: center; margin-top: .6rem; font-size: .82rem; }
+.confirm-grid input { width: 56px; background: var(--card-bg, #0f172a); border: 1px solid var(--border); color: #fff; padding: .3rem; border-radius: 4px; text-align: center; }
+.mini-btn { background: var(--primary); color: #fff; border: none; border-radius: .4rem; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .82rem; margin-top: .6rem; }
+.note-box { background: rgba(245,158,11,.1); border-left: 4px solid var(--warning); padding: .6rem .8rem; border-radius: .35rem; font-size: .82rem; margin-bottom: .75rem; }

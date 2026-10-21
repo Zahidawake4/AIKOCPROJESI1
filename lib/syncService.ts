@@ -4,12 +4,13 @@ import { decrypt } from "./crypto.js";
 import { appendSection, downloadImage, extractImages, getDocument } from "./docs.js";
 import { db } from "./firebase.js";
 import { refreshAccessToken, TokenRevokedError } from "./googleAuth.js";
-import { HttpError } from "./http.js";
+import { HttpError, sanitize } from "./http.js";
 import { SYNC_IMAGES_PER_RUN } from "./limits.js";
 import { generateWeeklyPlan } from "./planner.js";
+import { buildReport, type ReportData } from "./report.js";
 import { renderSyncSection } from "./render.js";
 import type { ExtractedImage, VisionResult, WeeklyPlan } from "./types.js";
-import { recordSection, topWeaknesses } from "./weaknesses.js";
+import { recordSection } from "./weaknesses.js";
 
 export interface SyncSummary {
   found: number;
@@ -18,6 +19,7 @@ export interface SyncSummary {
   failed: number;
   needsReview: number;
   planCreated: boolean;
+  planSource: "ai" | "fallback" | null;
   wroteToDoc: boolean;
   remaining: number; // bu turda işlenemeyen, sırada bekleyen görsel sayısı
 }
@@ -26,6 +28,8 @@ interface Options { maxImages?: number; minIntervalMs?: number }
 
 const chunks = <T,>(arr: T[], n: number): T[][] =>
   Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
+
+const errMsg = (e: unknown) => sanitize(e instanceof Error ? e.message : String(e));
 
 export async function syncUser(uid: string, opts: Options = {}): Promise<SyncSummary> {
   const database = db();
@@ -36,18 +40,21 @@ export async function syncUser(uid: string, opts: Options = {}): Promise<SyncSum
   // 1) Kilit: aynı kullanıcı için eşzamanlı senkronu engelle
   await database.runTransaction(async (tx) => {
     const snap = await tx.get(linkRef);
-    if (!snap.exists) throw new HttpError(404, "Google Docs bağlantısı bulunamadı.");
+    if (!snap.exists) throw new HttpError(404, "Google Docs bağlantısı bulunamadı.", "NO_LINK");
     const d = snap.data()!;
-    if (d.status === "reauth_required") throw new HttpError(409, "Google iznini yeniden vermen gerekiyor.");
-    if ((d.lock?.until?.toMillis?.() ?? 0) > Date.now()) throw new HttpError(409, "Senkronizasyon zaten sürüyor.");
+    if (d.status === "reauth_required") throw new HttpError(409, "Google iznini yeniden vermen gerekiyor.", "REAUTH");
+    if ((d.lock?.until?.toMillis?.() ?? 0) > Date.now()) throw new HttpError(409, "Senkronizasyon zaten sürüyor.", "SYNC_BUSY");
     const last = d.lastSyncAt?.toMillis?.() ?? 0;
     if (opts.minIntervalMs && Date.now() - last < opts.minIntervalMs) {
-      throw new HttpError(429, "Çok sık denedin. Bir dakika sonra tekrar dene.");
+      throw new HttpError(429, "Çok sık denedin. Birkaç saniye sonra tekrar dene.", "SYNC_COOLDOWN");
     }
     tx.update(linkRef, { lock: { until: Timestamp.fromMillis(Date.now() + 5 * 60_000) } });
   });
 
-  const summary: SyncSummary = { found: 0, analyzed: 0, duplicates: 0, failed: 0, needsReview: 0, planCreated: false, wroteToDoc: false, remaining: 0 };
+  const summary: SyncSummary = {
+    found: 0, analyzed: 0, duplicates: 0, failed: 0, needsReview: 0,
+    planCreated: false, planSource: null, wroteToDoc: false, remaining: 0,
+  };
   let lastError: string | null = null;
   let status = "active";
 
@@ -86,13 +93,16 @@ export async function syncUser(uid: string, opts: Options = {}): Promise<SyncSum
 
         const result = await analyzeImage(file);
         const analysisRef = database.collection(`users/${uid}/analyses`).doc();
+        const recordable = !result.needsReview;
         await analysisRef.set({
           ...result,
+          origin: "docs",
+          recorded: recordable, // false ise kullanıcı onayı bekler
           source: { docId: link.docId, inlineObjectId: img.inlineObjectId, imageHash: file.hash, position: img.index },
           createdAt: FieldValue.serverTimestamp(),
         });
         // Zayıflık istatistiği sadece güveni yeterli satırlardan beslenir
-        if (!result.needsReview) for (const s of result.sections) await recordSection(uid, s);
+        if (recordable) for (const s of result.sections) await recordSection(uid, s);
 
         await syncRef.set({ hash: file.hash, status: "done", analysisId: analysisRef.id, at: FieldValue.serverTimestamp() });
         analyses.push(result);
@@ -104,30 +114,36 @@ export async function syncUser(uid: string, opts: Options = {}): Promise<SyncSum
         await syncRef.set({
           status: "failed",
           attempts: (prev?.attempts ?? 0) + 1,
-          error: (e instanceof Error ? e.message : String(e)).slice(0, 300),
+          error: errMsg(e),
           at: FieldValue.serverTimestamp(),
         });
       }
     };
     for (const group of chunks(pending, 3)) await Promise.all(group.map(processOne));
 
-    // 4) Yeni veri geldiyse haftalık planı üret ve Docs'a yaz
+    // 4) Yeni veri geldiyse rapor + haftalık plan üret ve Docs'a yaz
     if (analyses.some((a) => a.sections.length > 0)) {
       const profile = (await database.doc(`users/${uid}`).get()).data() ?? {};
+
       let plan: WeeklyPlan | null = null;
       try {
-        plan = await generateWeeklyPlan(uid, { goal: profile.goal, dailyHours: profile.dailyHours });
+        const res = await generateWeeklyPlan(uid, { goal: profile.goal, dailyHours: profile.dailyHours });
+        plan = res.plan;
         summary.planCreated = true;
+        summary.planSource = res.source;
       } catch (e) {
-        lastError = `Plan üretilemedi: ${e instanceof Error ? e.message : e}`;
+        lastError = `Plan hazırlanamadı: ${errMsg(e)}`;
       }
+
+      let report: ReportData | null = null;
+      try { report = await buildReport(uid); } catch (e) { console.error("Rapor hatası:", e); }
+
       try {
-        const weak = await topWeaknesses(uid, 5);
-        await appendSection(accessToken, link.docId, renderSyncSection(analyses, weak, plan));
+        await appendSection(accessToken, link.docId, renderSyncSection(analyses, report, plan));
         summary.wroteToDoc = true;
       } catch (e) {
         // Analizler Firestore'da güvende; sadece Docs'a yazım başarısız
-        lastError = `Docs'a yazılamadı: ${e instanceof Error ? e.message : e}`;
+        lastError = `Docs'a yazılamadı: ${errMsg(e)}`;
       }
     }
   } catch (e) {
@@ -135,7 +151,7 @@ export async function syncUser(uid: string, opts: Options = {}): Promise<SyncSum
       status = "reauth_required";
       lastError = "Google izni iptal edilmiş veya süresi dolmuş. Yeniden bağlan.";
     } else {
-      lastError = e instanceof Error ? e.message.slice(0, 300) : "Bilinmeyen hata";
+      lastError = errMsg(e);
     }
     throw e;
   } finally {

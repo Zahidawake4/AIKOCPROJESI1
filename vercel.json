@@ -2,6 +2,10 @@
   "outputDirectory": "public",
   "functions": {
     "api/solve.ts": { "maxDuration": 60 },
+    "api/analyze.ts": { "maxDuration": 60 },
+    "api/confirm.ts": { "maxDuration": 30 },
+    "api/report.ts": { "maxDuration": 30 },
+    "api/health.ts": { "maxDuration": 30 },
     "api/coach.ts": { "maxDuration": 60 },
     "api/plan.ts": { "maxDuration": 60 },
     "api/google/*.ts": { "maxDuration": 30 },

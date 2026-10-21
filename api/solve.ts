@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { db, requireUid } from "../lib/firebase.js";
-import { GeminiError, generateJson } from "../lib/gemini.js";
+import { generateJson, toHttpError } from "../lib/gemini.js";
 import { HttpError, route } from "../lib/http.js";
 import { FREE_QUESTION_LIMIT } from "../lib/limits.js";
 import { LEVELS, OUTCOMES, SOLVE_SCHEMA, SOLVE_SYSTEM } from "../lib/prompts.js";
@@ -30,7 +30,7 @@ async function reserveQuota(uid: string): Promise<{ pro: boolean; left: number }
     const d = (await tx.get(ref)).data() ?? {};
     if (d.isProUser === true) return { pro: true, left: -1 };
     const left = typeof d.freeQuestionsLeft === "number" ? d.freeQuestionsLeft : FREE_QUESTION_LIMIT;
-    if (left <= 0) throw new HttpError(402, "Ücretsiz soru hakkın bitti.");
+    if (left <= 0) throw new HttpError(402, "Ücretsiz soru hakkın bitti.", "QUOTA_FREE");
     tx.set(ref, { freeQuestionsLeft: left - 1 }, { merge: true });
     return { pro: false, left: left - 1 };
   });
@@ -44,8 +44,8 @@ export default route(["POST"], async (req, res) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
 
   const imageBase64 = typeof b.imageBase64 === "string" ? b.imageBase64 : "";
-  if (!imageBase64) throw new HttpError(400, "Soru fotoğrafı eksik.");
-  if (imageBase64.length > 4_000_000) throw new HttpError(413, "Fotoğraf çok büyük. Daha küçük bir fotoğraf dene.");
+  if (!imageBase64) throw new HttpError(400, "Soru fotoğrafı eksik.", "NO_IMAGE");
+  if (imageBase64.length > 4_000_000) throw new HttpError(413, "Fotoğraf çok büyük. Daha küçük bir fotoğraf dene.", "IMAGE_TOO_BIG");
 
   const exam = b.examContext === "AYT" ? "AYT" : "TYT";
   const level = LEVELS[Number(b.level)] ? Number(b.level) : 1;
@@ -78,9 +78,8 @@ export default route(["POST"], async (req, res) => {
     });
   } catch (e) {
     if (!quota.pro) await refundQuota(uid).catch(() => {});
-    console.error("Solve hatası:", e);
-    if (e instanceof GeminiError && e.status === 429) throw new HttpError(429, "Yapay zeka şu an yoğun. Hakkın iade edildi, biraz sonra tekrar dene.");
-    throw new HttpError(502, "Çözüm üretilemedi. Hakkın iade edildi, tekrar dene.");
+    const err = toHttpError(e);
+    throw new HttpError(err.status, `${err.message} (Hakkın iade edildi.)`, err.code, err.detail);
   }
 
   const subjectKey = slug(out.subject);
@@ -99,7 +98,7 @@ export default route(["POST"], async (req, res) => {
       correct: outcome === "yavas" ? 1 : 0,
       wrong: outcome === "yanlis" || outcome === "bilmiyorum" ? 1 : 0,
       blank: outcome === "bos" ? 1 : 0,
-      totalQuestions: 1, net: null, wrongQuestionNumbers: [],
+      totalQuestions: 1, net: null, wrongQuestionNumbers: [], blankQuestionNumbers: [],
       errorPatterns: missed ? [{ type: out.errorType, description: note.slice(0, 200) || "Öğrencinin bildirdiği hata" }] : [],
       evidence: "manuel soru",
     };

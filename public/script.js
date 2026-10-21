@@ -17,6 +17,8 @@ let analyses = [];      // users/{uid}/analyses (Google Docs)
 let weaknesses = [];    // users/{uid}/weaknesses
 let latestPlan = null;  // users/{uid}/weeklyPlans (en yeni)
 let docSync = null;     // users/{uid}/docSync/state
+let reportData = null;  // /api/report çıktısı
+let analyzeFiles = [];  // Deneme Analizi kuyruğu
 
 const NET_CONFIG = {
   TYT: [
@@ -44,6 +46,11 @@ const OUTCOME_LABELS = { yanlis: "Yanlış", bos: "Boş", bilmiyor: "Bilmiyor", 
 const IMAGE_TYPE_LABELS = {
   deneme_karnesi: "Deneme karnesi", test_sayfasi: "Test sayfası", soru_bankasi_sayfasi: "Soru bankası",
   calisma_cizelgesi: "Çalışma çizelgesi", diger: "Diğer", okunamadi: "Okunamadı",
+};
+const ERROR_LABELS = {
+  bilgi_eksigi: "Bilgi eksikliği", kavram_eksigi: "Kavram yanılgısı", formul_unutma: "Formül unutma / yanlış formül",
+  islem_hatasi: "İşlem hatası", dikkat_hatasi: "Dikkat hatası", yorum_hatasi: "Soru yorumlama hatası",
+  sure_yetmedi: "Süre yetmedi", belirsiz: "Neden belirlenemedi",
 };
 const ACTIVITY_LABELS = { konu_calismasi: "Konu çalışması", soru_cozumu: "Soru çözümü", tekrar: "Tekrar", deneme: "Deneme", hata_defteri: "Hata defteri" };
 
@@ -93,8 +100,19 @@ async function postApi(path, body = {}) {
   });
   let data = {};
   try { data = await response.json(); } catch { /* boş gövde */ }
-  if (!response.ok) throw new Error(data.error || `Sunucu hatası: ${response.status}`);
+  if (!response.ok) {
+    const err = new Error(data.error || `Sunucu hatası: ${response.status}`);
+    err.code = data.code; err.detail = data.detail; err.requestId = data.requestId;
+    throw err;
+  }
   return data;
+}
+
+function errText(e) {
+  let m = e?.message || "Bilinmeyen hata";
+  if (e?.detail) m += ` (${e.detail})`;
+  if (e?.requestId) m += ` [ref: ${e.requestId}]`;
+  return m;
 }
 
 const safe = async (promise, fallback) => { try { return await promise; } catch (e) { console.error(e); return fallback; } };
@@ -124,6 +142,7 @@ window.addEventListener("load", () => {
   };
 
   setupDragDrop();
+  setupAnalyzeDrop();
   initVoiceRecognition();
   renderNetTable();
   calculateNet();
@@ -149,8 +168,10 @@ window.switchTab = function (tabId, btn) {
   const titles = {
     solver: "AI Soru Çözücü", wizard: "Net Sihirbazı", history: "Çözülen Sorular",
     docs: "Google Docs & Analiz", coach: "AI Koç & Program", report: "Aylık Rapor",
+    analyze: "Deneme Analizi", topics: "Konu & Hata Analizi",
   };
   $("headerTitle").innerText = titles[tabId] || "YKS 2027 Pro";
+  if (tabId === "topics" && activeUid) loadReport();
 };
 
 window.selectLevel = function (level) {
@@ -192,6 +213,7 @@ function renderAll() {
   renderHistory();
   renderWeaknesses();
   renderDocs();
+  renderUploadAnalyses();
   renderPlan();
   renderReportStats();
   renderNetExtras();
@@ -217,26 +239,35 @@ window.handleFileSelect = function (event) {
 };
 
 // Fotoğrafı küçültüp JPEG'e çevirir (istek limiti + hız için)
-function processImageFile(file) {
-  if (!file.type.startsWith("image/")) return toast("Lütfen bir resim dosyası seç.");
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.onload = () => {
-    const scale = Math.min(1, 1400 / Math.max(img.width, img.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(img.width * scale);
-    canvas.height = Math.round(img.height * scale);
-    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) return reject(new Error("Lütfen bir resim dosyası seç."));
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, 1400 / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      URL.revokeObjectURL(url);
+      resolve({ base64: dataUrl.split(",")[1], dataUrl });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Fotoğraf okunamadı (HEIC ise JPEG/PNG olarak dene).")); };
+    img.src = url;
+  });
+}
+
+async function processImageFile(file) {
+  try {
+    const { base64, dataUrl } = await compressImage(file);
     currentImageMimeType = "image/jpeg";
-    currentImageBase64 = dataUrl.split(",")[1];
+    currentImageBase64 = base64;
     const preview = $("imagePreview");
     preview.src = dataUrl;
     preview.style.display = "block";
-    URL.revokeObjectURL(url);
-  };
-  img.onerror = () => { URL.revokeObjectURL(url); toast("Fotoğraf okunamadı (HEIC ise JPEG/PNG olarak dene)."); };
-  img.src = url;
+  } catch (e) { toast(e.message); }
 }
 
 /* ---------- Soru çözümü ---------- */
@@ -267,7 +298,7 @@ window.solveQuestion = async function () {
     await loadAll();
   } catch (e) {
     $("detectedTopic").innerText = "Bir sorun oluştu";
-    $("solutionText").innerHTML = `<strong class="error-text">Hata:</strong> ${esc(e.message)}`;
+    $("solutionText").innerHTML = `<strong class="error-text">Hata:</strong> ${esc(errText(e))}`;
   } finally {
     btn.disabled = false;
   }
@@ -418,7 +449,7 @@ window.generateCoachAdvice = async function () {
     box.classList.remove("muted");
     box.innerHTML = formatText(data.advice);
   } catch (e) {
-    box.innerHTML = `<strong class="error-text">Hata:</strong> ${esc(e.message)}`;
+    box.innerHTML = `<strong class="error-text">Hata:</strong> ${esc(errText(e))}`;
   } finally { btn.disabled = false; }
 };
 
@@ -430,8 +461,9 @@ window.generatePlan = async function () {
     const data = await postApi("/api/plan");
     latestPlan = data.plan;
     renderPlan();
+    if (data.source === "fallback") toast("Yapay zeka şu an kullanılamadı; kural tabanlı yedek plan hazırlandı.");
   } catch (e) {
-    $("planBox").innerHTML = `<strong class="error-text">Hata:</strong> ${esc(e.message)}`;
+    $("planBox").innerHTML = `<strong class="error-text">Hata:</strong> ${esc(errText(e))}`;
   } finally { btn.disabled = false; }
 };
 
@@ -440,7 +472,8 @@ function renderPlan() {
   if (!latestPlan) { box.innerHTML = `<p class="muted">Henüz program yok.</p>`; return; }
   const p = latestPlan;
   box.innerHTML = `
-    <p class="muted" style="margin-bottom:.75rem;">Hafta başı: ${esc(p.weekStart)}</p>
+    <p class="muted" style="margin-bottom:.75rem;">Hafta başı: ${esc(p.weekStart)}${p.source === "fallback" ? " · <span class=\"badge warn\">Yedek plan</span>" : ""}</p>
+    ${p.note ? `<div class="note-box">${esc(p.note)}</div>` : ""}
     ${p.summary ? `<p class="solution-text" style="margin-bottom:1rem;">${esc(p.summary)}</p>` : ""}
     ${(p.days || []).map((d) => `
       <details class="plan-day">
@@ -478,24 +511,8 @@ function renderDocs() {
       </div>`;
   }
 
-  const list = $("docsAnalyses");
-  if (analyses.length === 0) { list.innerHTML = `<p class="muted">Henüz analiz yok.</p>`; return; }
-  list.innerHTML = analyses.map((a) => {
-    const rows = (a.sections || []).map((s) => {
-      const counts = s.correct != null && s.wrong != null ? `${s.correct}D ${s.wrong}Y ${s.blank ?? "-"}B · net ${s.net}` : "sayılar belirlenemedi";
-      return `<div style="font-size:.85rem;margin-top:.3rem;"><strong>${esc(s.subject)} • ${esc(s.topic)}</strong>: ${esc(counts)}</div>`;
-    }).join("") || `<div class="muted" style="font-size:.85rem;margin-top:.3rem;">Veri okunamadı.</div>`;
-    return `
-      <div class="history-item" style="align-items:flex-start;">
-        <div style="flex:1;">
-          <strong>${esc(IMAGE_TYPE_LABELS[a.imageType] || "Görsel")}</strong>
-          <span class="muted" style="font-size:.75rem;"> · ${esc(fmtDate(a.createdAt))} · güven %${Math.round((a.confidence || 0) * 100)}</span>
-          ${rows}
-          ${(a.issues || []).length ? `<div class="muted" style="font-size:.78rem;margin-top:.4rem;">${esc(a.issues.join(" · "))}</div>` : ""}
-        </div>
-        ${a.needsReview ? `<span class="badge warn">Kontrol et</span>` : ""}
-      </div>`;
-  }).join("");
+  const docsList = analyses.filter((x) => x.origin === "docs" || (!x.origin && x.source?.docId));
+  $("docsAnalyses").innerHTML = docsList.length ? docsList.map(analysisCardHtml).join("") : `<p class="muted">Henüz analiz yok.</p>`;
 }
 
 window.connectGoogleDocs = async function (skipConsent = false) {
@@ -515,7 +532,7 @@ window.syncNow = async function () {
     if (s.needsReview) msg += ` ${s.needsReview} tanesi kontrol gerektiriyor.`;
     if (s.remaining) msg += ` ${s.remaining} görsel daha sırada, tekrar senkronize et.`;
     toast(msg);
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(errText(e)); }
   await loadAll();
 };
 
@@ -524,7 +541,7 @@ window.disconnectGoogle = async function () {
   try {
     await postApi("/api/google/disconnect");
     toast("Bağlantı kesildi.");
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(errText(e)); }
   await loadAll();
 };
 
@@ -615,3 +632,230 @@ function processVoiceCommand(raw) {
   else if (t.includes("üçüncü kademe")) selectLevel(3);
   else if (t.includes("çöz")) solveQuestion();
 }
+
+/* =====================================================================
+   Fotoğraf analizi, konu/hata raporu, sistem testi
+   ===================================================================== */
+
+/* ---------- Analiz kartı (hem Docs hem Deneme Analizi için) ---------- */
+function analysisCardHtml(a) {
+  const sections = a.sections || [];
+  const rows = sections.map((s) => {
+    const counts = s.correct != null && s.wrong != null
+      ? `${s.correct}D ${s.wrong}Y ${s.blank ?? "-"}B · net ${s.net}` : "sayılar belirlenemedi";
+    const wrongN = (s.wrongQuestionNumbers || []).length ? `<div class="muted" style="font-size:.78rem;">Yanlış sorular: ${esc(s.wrongQuestionNumbers.join(", "))}</div>` : "";
+    const blankN = (s.blankQuestionNumbers || []).length ? `<div class="muted" style="font-size:.78rem;">Boş sorular: ${esc(s.blankQuestionNumbers.join(", "))}</div>` : "";
+    const causes = (s.errorPatterns || []).map((p) =>
+      `<div style="font-size:.78rem;color:var(--warning);">${esc(ERROR_LABELS[p.type] || p.type)}: ${esc(p.description)}</div>`).join("");
+    return `<div style="margin-top:.55rem;"><div style="font-size:.85rem;"><strong>${esc(s.subject)} • ${esc(s.topic)}</strong>: ${esc(counts)}</div>${wrongN}${blankN}${causes}</div>`;
+  }).join("") || `<div class="muted" style="font-size:.85rem;margin-top:.3rem;">Veri okunamadı.</div>`;
+
+  const pending = a.needsReview && a.recorded !== true && sections.length > 0;
+  const confirm = pending ? `
+    <div class="note-box" style="margin-top:.75rem;">Okuma güveni düşük: sayıları kontrol edip onaylayana kadar istatistiğe eklenmez.</div>
+    <div class="confirm-grid"><span></span><span class="muted">D</span><span class="muted">Y</span><span class="muted">B</span>
+      ${sections.map((s, i) => `<span>${esc(s.subject)} • ${esc(s.topic)}</span>
+        <input type="number" min="0" id="cf-${esc(a.id)}-${i}-d" value="${s.correct ?? ""}">
+        <input type="number" min="0" id="cf-${esc(a.id)}-${i}-y" value="${s.wrong ?? ""}">
+        <input type="number" min="0" id="cf-${esc(a.id)}-${i}-b" value="${s.blank ?? ""}">`).join("")}
+    </div>
+    <button class="mini-btn" onclick="confirmAnalysis('${esc(a.id)}')">Onayla ve istatistiğe ekle</button>` : "";
+
+  return `
+    <div class="history-item" style="align-items:flex-start;">
+      <div style="flex:1;min-width:0;">
+        <strong>${esc(IMAGE_TYPE_LABELS[a.imageType] || "Görsel")}</strong>
+        <span class="muted" style="font-size:.75rem;"> · ${esc(fmtDate(a.createdAt))} · güven %${Math.round((a.confidence || 0) * 100)}</span>
+        ${rows}
+        ${(a.issues || []).length ? `<div class="muted" style="font-size:.78rem;margin-top:.4rem;">${esc(a.issues.join(" · "))}</div>` : ""}
+        ${confirm}
+      </div>
+      ${pending ? `<span class="badge warn">Kontrol et</span>` : a.confirmed ? `<span class="badge ok">Onaylandı</span>` : ""}
+    </div>`;
+}
+
+function renderUploadAnalyses() {
+  const list = analyses.filter((x) => x.origin === "upload");
+  $("uploadAnalyses").innerHTML = list.length ? list.map(analysisCardHtml).join("") : `<p class="muted">Henüz analiz yok.</p>`;
+}
+
+window.confirmAnalysis = async function (id) {
+  const a = analyses.find((x) => x.id === id);
+  if (!a) return;
+  const val = (suffix, i) => {
+    const v = $(`cf-${id}-${i}-${suffix}`)?.value;
+    return v === "" || v == null ? null : Number(v);
+  };
+  const sections = (a.sections || []).map((_, i) => ({ index: i, correct: val("d", i), wrong: val("y", i), blank: val("b", i) }));
+  try {
+    const r = await postApi("/api/confirm", { analysisId: id, sections });
+    toast(r.recorded > 0 ? `${r.recorded} konu istatistiğe eklendi.` : "Doğru ve yanlış sayılarını girmelisin; bu analiz kaydedilemedi.");
+  } catch (e) { toast(errText(e)); }
+  await loadAll();
+};
+
+/* ---------- Deneme Analizi kuyruğu ---------- */
+function setupAnalyzeDrop() {
+  const area = $("analyzeArea");
+  if (!area) return;
+  ["dragenter", "dragover"].forEach((ev) => area.addEventListener(ev, (e) => { e.preventDefault(); area.classList.add("dragover"); }));
+  ["dragleave", "drop"].forEach((ev) => area.addEventListener(ev, (e) => { e.preventDefault(); area.classList.remove("dragover"); }));
+  area.addEventListener("drop", (e) => addAnalyzeFiles([...e.dataTransfer.files]));
+}
+
+window.handleAnalyzeFiles = function (event) {
+  addAnalyzeFiles([...event.target.files]);
+  event.target.value = "";
+};
+
+function addAnalyzeFiles(files) {
+  // Bitmiş öğeleri temizle, kuyruk en fazla 10 görsel
+  analyzeFiles = analyzeFiles.filter((f) => f.state === "bekliyor" || f.state === "hata");
+  const room = 10 - analyzeFiles.length;
+  files.filter((f) => f.type.startsWith("image/")).slice(0, Math.max(0, room)).forEach((file) => {
+    analyzeFiles.push({ file, name: file.name, state: "bekliyor", msg: "", thumb: URL.createObjectURL(file) });
+  });
+  renderAnalyzeQueue();
+}
+
+function renderAnalyzeQueue() {
+  const icons = { bekliyor: "⏳", calisiyor: "🔄", tamam: "✅", tekrar: "♻️", hata: "❌" };
+  $("analyzeQueue").innerHTML = analyzeFiles.map((f, i) => `
+    <div class="thumb-row">
+      <img src="${esc(f.thumb)}" alt="">
+      <div class="grow">${icons[f.state] || ""} ${esc(f.name)}<div class="muted" style="font-size:.75rem;">${esc(f.msg || (f.state === "bekliyor" ? "Sırada" : ""))}</div></div>
+      ${f.state === "bekliyor" || f.state === "hata" ? `<button class="icon-btn" onclick="removeAnalyzeFile(${i})" title="Kaldır"><i class="fa-solid fa-xmark"></i></button>` : ""}
+    </div>`).join("");
+  $("analyzeBtn").disabled = !analyzeFiles.some((f) => f.state === "bekliyor" || f.state === "hata");
+}
+
+window.removeAnalyzeFile = function (i) {
+  URL.revokeObjectURL(analyzeFiles[i]?.thumb);
+  analyzeFiles.splice(i, 1);
+  renderAnalyzeQueue();
+};
+
+window.runAnalysisBatch = async function () {
+  if (!activeUid) return toast("Önce giriş yapmalısın.");
+  const exam = document.querySelector('input[name="examContext"]:checked').value;
+  const btn = $("analyzeBtn");
+  btn.disabled = true;
+
+  for (const item of analyzeFiles) {
+    if (item.state !== "bekliyor" && item.state !== "hata") continue;
+    item.state = "calisiyor"; item.msg = "Fotoğraf hazırlanıyor ve analiz ediliyor..."; renderAnalyzeQueue();
+    try {
+      const { base64 } = await compressImage(item.file);
+      const r = await postApi("/api/analyze", { imageBase64: base64, mimeType: "image/jpeg", examContext: exam });
+      if (r.duplicate) { item.state = "tekrar"; item.msg = "Bu görsel daha önce analiz edilmiş."; }
+      else {
+        const n = r.analysis?.sections?.length || 0;
+        item.state = "tamam";
+        item.msg = n ? `${n} ders/konu okundu${r.analysis.needsReview ? " · kontrol et" : ""}` : "Veri okunamadı (görsel net değil olabilir)";
+      }
+    } catch (e) { item.state = "hata"; item.msg = errText(e); }
+    renderAnalyzeQueue();
+  }
+  await loadAll();
+  if (!$("tab-topics").classList.contains("active")) reportData = null; // konu raporu yeniden hesaplansın
+  renderAnalyzeQueue();
+};
+
+/* ---------- Konu & Hata Analizi ---------- */
+window.loadReport = async function () {
+  const box = $("reportBox");
+  if (!reportData) box.innerHTML = `<div class="card"><p class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Rapor hazırlanıyor...</p></div>`;
+  $("reportBtn").disabled = true;
+  try {
+    reportData = await postApi("/api/report");
+    renderReport();
+  } catch (e) {
+    box.innerHTML = `<div class="card"><strong class="error-text">Hata:</strong> ${esc(errText(e))}</div>`;
+  } finally { $("reportBtn").disabled = false; }
+};
+
+function renderReport() {
+  const r = reportData;
+  if (!r) return;
+  const t = r.totals;
+  const pct = (x) => Math.round(x * 100);
+
+  const summary = `
+    <div class="card">
+      <h4>Genel görünüm</h4>
+      <div class="grid-2" style="margin:1rem 0 0;">
+        <div class="stat-row"><span>Denenen soru</span><strong>${esc(t.attempted)}</strong></div>
+        <div class="stat-row"><span>Yanlış / Boş</span><strong style="color:var(--warning);">${esc(t.wrong)} / ${esc(t.blank)}</strong></div>
+        <div class="stat-row"><span>Takip edilen konu</span><strong>${esc(t.topics)}</strong></div>
+        <div class="stat-row"><span>Okunan analiz</span><strong>${esc(r.dataQuality.analyses)}</strong></div>
+      </div>
+      ${(r.advice || []).map((x) => `<div class="note-box" style="margin-top:.75rem;margin-bottom:0;">${esc(x)}</div>`).join("")}
+    </div>`;
+
+  const causes = r.causeTotals.length ? `
+    <div class="card">
+      <h4><i class="fa-solid fa-magnifying-glass"></i> Hatalar neden kaynaklanıyor?</h4>
+      <div style="margin-top:1rem;">
+        ${r.causeTotals.map((c) => `
+          <div class="cause-bar"><div>${esc(c.label)} <span class="muted" style="float:right;">${esc(c.count)} kez · %${esc(c.percent)}</span></div>
+            <div class="bar"><span style="width:${Math.min(100, c.percent)}%"></span></div></div>`).join("")}
+      </div>
+    </div>` : "";
+
+  const subjects = r.weakSubjects.length ? `
+    <div class="card"><h4>Derslere göre hata oranı</h4><div style="margin-top:1rem;">
+      ${r.weakSubjects.map((s) => `
+        <div class="weak-item"><div><strong>${esc(s.subject)}</strong><span class="muted" style="float:right;">%${pct(s.missRate)} · ${esc(s.attempted)} soru</span></div>
+          <div class="bar"><span style="width:${pct(s.missRate)}%"></span></div></div>`).join("")}
+    </div></div>` : "";
+
+  const topics = r.topics.length ? `
+    <div class="card"><h4>Konu konu detay</h4><div style="margin-top:1rem;">
+      ${r.topics.map((x) => `
+        <details class="topic-card">
+          <summary><span><strong>${esc(x.subject)} • ${esc(x.topic)}</strong>${x.chronic ? ' <span class="badge bad">Kronik</span>' : ""}</span>
+            <span class="muted">%${pct(x.missRate)} hata${x.dominantLabel ? " · " + esc(x.dominantLabel) : ""}</span></summary>
+          <div class="inner">
+            <div>${esc(x.correct)} doğru · ${esc(x.wrong)} yanlış · ${esc(x.blank)} boş (${esc(x.attempted)} soru, ${esc(x.sessions)} oturum)</div>
+            ${x.causes.length ? `<div style="margin-top:.5rem;"><strong style="color:var(--text-main);">Neden dağılımı:</strong> ${x.causes.map((c) => `${esc(c.label)} (${esc(c.count)})`).join(", ")}</div>` : ""}
+            <div style="margin-top:.5rem;"><strong style="color:var(--text-main);">Ne yapmalı:</strong> ${esc(x.remedy)}</div>
+            ${x.examples.length ? `<div style="margin-top:.5rem;"><strong style="color:var(--text-main);">Son gözlemler:</strong><ul style="margin:.3rem 0 0 1.1rem;">${x.examples.map((e) => `<li>${esc(e.label)}: ${esc(e.description)}</li>`).join("")}</ul></div>` : ""}
+          </div>
+        </details>`).join("")}
+    </div></div>` : `<div class="card"><p class="muted">Henüz konu bazlı veri yok. Bir soru çöz veya Deneme Analizi sekmesinden fotoğraf yükle.</p></div>`;
+
+  $("reportBox").innerHTML = summary + causes + subjects + topics;
+}
+
+window.generateReportAdvice = async function () {
+  const btn = $("aiReportBtn"), card = $("reportAiCard"), text = $("reportAiText");
+  btn.disabled = true;
+  card.style.display = "block";
+  text.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Koç verilerini yorumluyor...`;
+  try {
+    const data = await postApi("/api/coach");
+    text.innerHTML = formatText(data.advice);
+  } catch (e) {
+    text.innerHTML = `<strong class="error-text">Hata:</strong> ${esc(errText(e))}`;
+  } finally { btn.disabled = false; }
+};
+
+/* ---------- Sistem testi ---------- */
+window.closeHealth = function () { $("healthModal").style.display = "none"; };
+
+window.runHealthCheck = async function () {
+  if (!activeUid) return toast("Önce giriş yapmalısın.");
+  $("healthModal").style.display = "flex";
+  $("healthBody").innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Test ediliyor...`;
+  const row = (name, ok, extra = "") => `<div class="chk-row"><span>${esc(name)}${extra ? `<div class="muted" style="font-size:.75rem;">${esc(extra)}</div>` : ""}</span><span>${ok ? "✅" : "❌"}</span></div>`;
+  try {
+    const h = await postApi("/api/health");
+    $("healthBody").innerHTML =
+      `<p style="margin-bottom:.75rem;">${h.ok ? "<strong style='color:var(--success);'>Temel sistemler çalışıyor.</strong>" : "<strong class='error-text'>Sorun bulundu.</strong>"}</p>` +
+      Object.entries(h.env).map(([k, v]) => row(k, v)).join("") +
+      row("Firestore bağlantısı", h.firestore.ok, h.firestore.error || "") +
+      row(`Gemini (${h.gemini.model})`, h.gemini.ok, h.gemini.error || "");
+  } catch (e) {
+    $("healthBody").innerHTML = `<strong class="error-text">Test çalıştırılamadı:</strong> ${esc(errText(e))}`;
+  }
+};

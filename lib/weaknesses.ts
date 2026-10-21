@@ -2,6 +2,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { db } from "./firebase.js";
 import type { SectionResult } from "./types.js";
 
+export interface RecentCause { type: string; description: string; at: string }
+
 export interface WeaknessDoc {
   subject: string;
   topic: string;
@@ -11,6 +13,7 @@ export interface WeaknessDoc {
   sessions: number;
   wrongSessions: number;
   errorTypes: Record<string, number>;
+  recentCauses?: RecentCause[];
   chronicScore: number;
 }
 
@@ -27,9 +30,16 @@ export async function recordSection(uid: string, s: SectionResult): Promise<void
     const wrong = (d.wrong ?? 0) + s.wrong!;
     const blank = (d.blank ?? 0) + (s.blank ?? 0);
     const sessions = (d.sessions ?? 0) + 1;
-    const wrongSessions = (d.wrongSessions ?? 0) + (s.wrong! > 0 ? 1 : 0);
-    const errorTypes = { ...(d.errorTypes ?? {}) };
+    const wrongSessions = (d.wrongSessions ?? 0) + (s.wrong! + (s.blank ?? 0) > 0 ? 1 : 0);
+
+    const errorTypes: Record<string, number> = { ...(d.errorTypes ?? {}) };
     for (const p of s.errorPatterns) errorTypes[p.type] = (errorTypes[p.type] ?? 0) + 1;
+
+    const now = new Date().toISOString();
+    const recentCauses: RecentCause[] = [
+      ...(d.recentCauses ?? []),
+      ...s.errorPatterns.map((p) => ({ type: p.type, description: p.description, at: now })),
+    ].slice(-5);
 
     const attempted = correct + wrong + blank;
     const missRate = attempted > 0 ? (wrong + blank) / attempted : 0;
@@ -38,7 +48,7 @@ export async function recordSection(uid: string, s: SectionResult): Promise<void
 
     tx.set(ref, {
       subject: s.subject, topic: s.topic,
-      correct, wrong, blank, sessions, wrongSessions, errorTypes, chronicScore,
+      correct, wrong, blank, sessions, wrongSessions, errorTypes, recentCauses, chronicScore,
       lastSeen: FieldValue.serverTimestamp(),
     });
   });

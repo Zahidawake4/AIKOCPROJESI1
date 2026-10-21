@@ -18,8 +18,8 @@ export const IMAGE_TYPES = [
 export type ImageType = (typeof IMAGE_TYPES)[number];
 
 export const ERROR_TYPES = [
-  "islem_hatasi", "kavram_eksigi", "dikkat_hatasi",
-  "bilgi_eksigi", "sure_yetmedi", "yorum_hatasi", "belirsiz",
+  "bilgi_eksigi", "kavram_eksigi", "formul_unutma", "islem_hatasi",
+  "dikkat_hatasi", "yorum_hatasi", "sure_yetmedi", "belirsiz",
 ] as const;
 export type ErrorType = (typeof ERROR_TYPES)[number];
 
@@ -36,6 +36,7 @@ export interface SectionResult {
   totalQuestions: number | null;
   net: number | null;
   wrongQuestionNumbers: number[];
+  blankQuestionNumbers: number[];
   errorPatterns: ErrorPattern[];
   evidence: string;
 }
@@ -49,6 +50,8 @@ export interface VisionResult {
   sections: SectionResult[];
   issues: string[];
 }
+
+export type AnalysisOrigin = "upload" | "docs";
 
 export interface ExtractedImage { inlineObjectId: string; contentUri: string; index: number }
 export interface DownloadedImage { base64: string; mimeType: string; hash: string; bytes: number }
@@ -67,6 +70,8 @@ export interface WeeklyPlan {
   summary: string;
   focusTopics: string[];
   days: PlanDay[];
+  source?: "ai" | "fallback";
+  note?: string | null;
 }
 
 export interface DocLine { text: string; style: "H1" | "H2" | "H3" | "P" | "BULLET" }
